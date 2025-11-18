@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 from sgr_deep_research.core.policies import DefaultToolSelectionPolicy
-from sgr_deep_research.core.tools import ClarificationTool, CreateReportTool, FinalAnswerTool
-from sgr_deep_research.research.tools import ExtractPageContentTool, WebSearchTool
+from sgr_deep_research.core.tools import ClarificationTool, FinalAnswerTool
+from sgr_deep_research.research.tools import (
+    CreateReportTool,
+    ExtractPageContentTool,
+    WebSearchTool,
+)
 
 
 class ResearchToolSelectionPolicy(DefaultToolSelectionPolicy):
