@@ -1,19 +1,22 @@
 import sgr_deep_research.core.tools as tools
+import sgr_deep_research.research.tools as research_tools
 from sgr_deep_research.core.agent_definition import AgentDefinition
-from sgr_deep_research.core.agents.sgr_agent import SGRAgent
-from sgr_deep_research.core.agents.sgr_auto_tool_calling_agent import SGRAutoToolCallingAgent
-from sgr_deep_research.core.agents.sgr_so_tool_calling_agent import SGRSOToolCallingAgent
-from sgr_deep_research.core.agents.sgr_tool_calling_agent import SGRToolCallingAgent
-from sgr_deep_research.core.agents.tool_calling_agent import ToolCallingAgent
+from sgr_deep_research.research.agents import (
+    ResearchSGRAgent,
+    ResearchSGRAutoToolCallingAgent,
+    ResearchSGRSOToolCallingAgent,
+    ResearchSGRToolCallingAgent,
+    ResearchToolCallingAgent,
+)
 
 DEFAULT_TOOLKIT = [
     tools.ClarificationTool,
     tools.GeneratePlanTool,
     tools.AdaptPlanTool,
     tools.FinalAnswerTool,
-    tools.WebSearchTool,
-    tools.ExtractPageContentTool,
-    tools.CreateReportTool,
+    research_tools.WebSearchTool,
+    research_tools.ExtractPageContentTool,
+    research_tools.CreateReportTool,
 ]
 
 
@@ -29,27 +32,27 @@ def get_default_agents_definitions() -> dict[str, AgentDefinition]:
     agents = [
         AgentDefinition(
             name="sgr_agent",
-            base_class=SGRAgent,
+            base_class=ResearchSGRAgent,
             tools=DEFAULT_TOOLKIT,
         ),
         AgentDefinition(
             name="tool_calling_agent",
-            base_class=ToolCallingAgent,
+            base_class=ResearchToolCallingAgent,
             tools=DEFAULT_TOOLKIT,
         ),
         AgentDefinition(
             name="sgr_tool_calling_agent",
-            base_class=SGRToolCallingAgent,
+            base_class=ResearchSGRToolCallingAgent,
             tools=DEFAULT_TOOLKIT,
         ),
         AgentDefinition(
             name="sgr_auto_tool_calling_agent",
-            base_class=SGRAutoToolCallingAgent,
+            base_class=ResearchSGRAutoToolCallingAgent,
             tools=DEFAULT_TOOLKIT,
         ),
         AgentDefinition(
             name="sgr_so_tool_calling_agent",
-            base_class=SGRSOToolCallingAgent,
+            base_class=ResearchSGRSOToolCallingAgent,
             tools=DEFAULT_TOOLKIT,
         ),
     ]

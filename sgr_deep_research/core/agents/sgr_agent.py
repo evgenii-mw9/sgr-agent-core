@@ -4,14 +4,12 @@ from openai import AsyncOpenAI
 
 from sgr_deep_research.core.agent_definition import ExecutionConfig, LLMConfig, PromptsConfig
 from sgr_deep_research.core.base_agent import BaseAgent
+from sgr_deep_research.core.policies import ToolSelectionPolicy
+from sgr_deep_research.core.reasoning import BaseReasoningTool
 from sgr_deep_research.core.tools import (
     BaseTool,
-    ClarificationTool,
-    CreateReportTool,
-    FinalAnswerTool,
     NextStepToolsBuilder,
     NextStepToolStub,
-    WebSearchTool,
 )
 
 
@@ -28,6 +26,7 @@ class SGRAgent(BaseAgent):
         prompts_config: PromptsConfig,
         execution_config: ExecutionConfig,
         toolkit: list[Type[BaseTool]] | None = None,
+        tool_selection_policy: ToolSelectionPolicy | None = None,
     ):
         super().__init__(
             task=task,
@@ -36,28 +35,15 @@ class SGRAgent(BaseAgent):
             prompts_config=prompts_config,
             execution_config=execution_config,
             toolkit=toolkit,
+            tool_selection_policy=tool_selection_policy,
         )
-        self.max_searches = execution_config.max_searches
 
     async def _prepare_tools(self) -> Type[NextStepToolStub]:
         """Prepare tool classes with current context limits."""
-        tools = set(self.toolkit)
-        if self._context.iteration >= self.max_iterations:
-            tools = {
-                CreateReportTool,
-                FinalAnswerTool,
-            }
-        if self._context.clarifications_used >= self.max_clarifications:
-            tools -= {
-                ClarificationTool,
-            }
-        if self._context.searches_used >= self.max_searches:
-            tools -= {
-                WebSearchTool,
-            }
+        tools = self.tool_selection_policy.tools_for_reasoning(self)
         return NextStepToolsBuilder.build_NextStepTools(list(tools))
 
-    async def _reasoning_phase(self) -> NextStepToolStub:
+    async def _reasoning_phase(self) -> BaseReasoningTool:
         async with self.openai_client.chat.completions.stream(
             model=self.llm_config.model,
             response_format=await self._prepare_tools(),
@@ -74,14 +60,14 @@ class SGRAgent(BaseAgent):
         self._log_reasoning(reasoning)
         return reasoning
 
-    async def _select_action_phase(self, reasoning: NextStepToolStub) -> BaseTool:
+    async def _select_action_phase(self, reasoning: BaseReasoningTool) -> BaseTool:
         tool = reasoning.function
         if not isinstance(tool, BaseTool):
             raise ValueError("Selected tool is not a valid BaseTool instance")
         self.conversation.append(
             {
                 "role": "assistant",
-                "content": reasoning.remaining_steps[0] if reasoning.remaining_steps else "Completing",
+                "content": reasoning.next_step_text(),
                 "tool_calls": [
                     {
                         "type": "function",

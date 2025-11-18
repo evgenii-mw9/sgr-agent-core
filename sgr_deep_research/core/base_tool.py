@@ -11,7 +11,7 @@ from sgr_deep_research.core.agent_config import GlobalConfig
 from sgr_deep_research.core.services.registry import ToolRegistry
 
 if TYPE_CHECKING:
-    from sgr_deep_research.core.models import ResearchContext
+    from sgr_deep_research.core.models import BaseContext
 
 
 logger = logging.getLogger(__name__)
@@ -30,7 +30,7 @@ class BaseTool(BaseModel, ToolRegistryMixin):
     tool_name: ClassVar[str] = None
     description: ClassVar[str] = None
 
-    async def __call__(self, context: ResearchContext) -> str:
+    async def __call__(self, context: BaseContext) -> str:
         """Result should be a string or dumped json."""
         raise NotImplementedError("Execute method must be implemented by subclass")
 

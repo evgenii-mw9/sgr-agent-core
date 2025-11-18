@@ -12,7 +12,7 @@ from unittest.mock import Mock
 import pytest
 
 from sgr_deep_research.core.base_agent import BaseAgent
-from sgr_deep_research.core.models import AgentStatesEnum, ResearchContext
+from sgr_deep_research.core.models import AgentStatesEnum, BaseContext
 from sgr_deep_research.core.tools import BaseTool, ReasoningTool
 from tests.conftest import create_test_agent
 
@@ -82,12 +82,11 @@ class TestBaseAgentInitialization:
         assert CustomTool in agent.toolkit
 
     def test_context_initialization(self):
-        """Test that ResearchContext is initialized."""
+        """Test that a base context is initialized."""
         agent = create_test_agent(BaseAgent, task="Test")
 
-        assert isinstance(agent._context, ResearchContext)
+        assert isinstance(agent._context, BaseContext)
         assert agent._context.iteration == 0
-        assert agent._context.searches_used == 0
         assert agent._context.clarifications_used == 0
 
     def test_conversation_log_initialization(self):

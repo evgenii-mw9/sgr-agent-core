@@ -42,6 +42,19 @@ class ReasoningTool(BaseTool):
     )
     task_completed: bool = Field(description="Is the research task finished?")
 
+    def to_log_summary(self):
+        return {
+            "reasoning_steps": self.reasoning_steps,
+            "current_situation": self.current_situation,
+            "plan_status": self.plan_status,
+            "enough_data": self.enough_data,
+            "remaining_steps": self.remaining_steps,
+            "task_completed": self.task_completed,
+        }
+
+    def next_step_text(self) -> str:
+        return self.remaining_steps[0] if self.remaining_steps else "Completing"
+
     async def __call__(self, *args, **kwargs):
         return self.model_dump_json(
             indent=2,

@@ -10,12 +10,9 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from sgr_deep_research.core.models import (
-    AgentStatesEnum,
-    ResearchContext,
-    SearchResult,
-    SourceData,
-)
+from sgr_deep_research.core.models import AgentStatesEnum
+from sgr_deep_research.research.context import ResearchContext
+from sgr_deep_research.research.models import SearchResult, SourceData
 
 
 class TestSourceData:

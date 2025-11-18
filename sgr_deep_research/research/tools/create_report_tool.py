@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 import json
 import logging
 import os
@@ -12,7 +10,7 @@ from sgr_deep_research.core.agent_config import GlobalConfig
 from sgr_deep_research.core.base_tool import BaseTool
 
 if TYPE_CHECKING:
-    from sgr_deep_research.core.models import ResearchContext
+    from sgr_deep_research.research.context import ResearchContext
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
