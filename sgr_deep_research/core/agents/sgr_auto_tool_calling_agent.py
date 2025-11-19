@@ -5,6 +5,7 @@ from openai import AsyncOpenAI
 
 from sgr_deep_research.core.agent_definition import ExecutionConfig, LLMConfig, PromptsConfig
 from sgr_deep_research.core.agents.sgr_tool_calling_agent import SGRToolCallingAgent
+from sgr_deep_research.core.policies import ToolSelectionPolicy
 from sgr_deep_research.core.tools import BaseTool
 
 
@@ -22,6 +23,7 @@ class SGRAutoToolCallingAgent(SGRToolCallingAgent):
         prompts_config: PromptsConfig,
         execution_config: ExecutionConfig,
         toolkit: list[Type[BaseTool]] | None = None,
+        tool_selection_policy: ToolSelectionPolicy | None = None,
     ):
         super().__init__(
             task=task,
@@ -30,6 +32,7 @@ class SGRAutoToolCallingAgent(SGRToolCallingAgent):
             prompts_config=prompts_config,
             execution_config=execution_config,
             toolkit=toolkit,
+            tool_selection_policy=tool_selection_policy,
         )
         self.tool_choice: Literal["auto"] = "auto"
         warn(

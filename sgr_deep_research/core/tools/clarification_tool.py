@@ -7,7 +7,7 @@ from pydantic import Field
 from sgr_deep_research.core.base_tool import BaseTool
 
 if TYPE_CHECKING:
-    from sgr_deep_research.core.models import ResearchContext
+    from sgr_deep_research.core.models import BaseContext
 
 
 class ClarificationTool(BaseTool):
@@ -33,5 +33,5 @@ class ClarificationTool(BaseTool):
         max_length=3,
     )
 
-    async def __call__(self, context: ResearchContext) -> str:
+    async def __call__(self, context: BaseContext) -> str:
         return "\n".join(self.questions)

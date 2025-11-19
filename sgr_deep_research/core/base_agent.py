@@ -1,4 +1,5 @@
 import json
+import json
 import logging
 import os
 import traceback
@@ -10,15 +11,13 @@ from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletionFunctionToolParam
 
 from sgr_deep_research.core.agent_definition import ExecutionConfig, LLMConfig, PromptsConfig
-from sgr_deep_research.core.models import AgentStatesEnum, ResearchContext
+from sgr_deep_research.core.models import AgentStatesEnum, BaseContext
+from sgr_deep_research.core.policies import DefaultToolSelectionPolicy, ToolSelectionPolicy
+from sgr_deep_research.core.reasoning import BaseReasoningTool
 from sgr_deep_research.core.services.prompt_loader import PromptLoader
 from sgr_deep_research.core.services.registry import AgentRegistry
 from sgr_deep_research.core.stream import OpenAIStreamingGenerator
-from sgr_deep_research.core.tools import (
-    BaseTool,
-    ClarificationTool,
-    ReasoningTool,
-)
+from sgr_deep_research.core.tools import BaseTool
 
 
 class AgentRegistryMixin:
@@ -32,6 +31,8 @@ class BaseAgent(AgentRegistryMixin):
     """Base class for agents."""
 
     name: str = "base_agent"
+    context_cls: Type[BaseContext] = BaseContext
+    interrupting_tool_types: tuple[type[BaseTool], ...] = tuple()
 
     def __init__(
         self,
@@ -41,6 +42,7 @@ class BaseAgent(AgentRegistryMixin):
         prompts_config: PromptsConfig,
         execution_config: ExecutionConfig,
         toolkit: list[Type[BaseTool]] | None = None,
+        tool_selection_policy: ToolSelectionPolicy | None = None,
         **kwargs: dict,
     ):
         self.id = f"{self.name}_{uuid.uuid4()}"
@@ -49,15 +51,17 @@ class BaseAgent(AgentRegistryMixin):
         self.task = task
         self.toolkit = toolkit or []
 
-        self._context = ResearchContext()
+        self._context = self.context_cls()
         self.conversation = []
         self.log = []
         self.max_iterations = execution_config.max_iterations
         self.max_clarifications = execution_config.max_clarifications
+        self.execution_config = execution_config
 
         self.openai_client = openai_client
         self.llm_config = llm_config
         self.prompts_config = prompts_config
+        self.tool_selection_policy = tool_selection_policy or DefaultToolSelectionPolicy()
 
         self.streaming_generator = OpenAIStreamingGenerator(model=self.id)
 
@@ -71,29 +75,23 @@ class BaseAgent(AgentRegistryMixin):
         self._context.state = AgentStatesEnum.RESEARCHING
         self.logger.info(f"✅ Clarification received: {clarifications[:2000]}...")
 
-    def _log_reasoning(self, result: ReasoningTool) -> None:
-        next_step = result.remaining_steps[0] if result.remaining_steps else "Completing"
+    def _log_reasoning(self, result: BaseReasoningTool) -> None:
+        summary = result.to_log_summary()
+        next_step = result.next_step_text()
         self.logger.info(
             f"""
-    ###############################################
-    🤖 LLM RESPONSE DEBUG:
-       🧠 Reasoning Steps: {result.reasoning_steps}
-       📊 Current Situation: '{result.current_situation[:400]}...'
-       📋 Plan Status: '{result.plan_status[:400]}...'
-       🔍 Searches Done: {self._context.searches_used}
-       🔍 Clarifications Done: {self._context.clarifications_used}
-       ✅ Enough Data: {result.enough_data}
-       📝 Remaining Steps: {result.remaining_steps}
-       🏁 Task Completed: {result.task_completed}
-       ➡️ Next Step: {next_step}
-    ###############################################"""
+###############################################
+🤖 LLM RESPONSE DEBUG:
+   ➡️ Next Step: {next_step}
+   🧠 Summary: {json.dumps(summary, ensure_ascii=False)[:1500]}...
+###############################################"""
         )
         self.log.append(
             {
                 "step_number": self._context.iteration,
                 "timestamp": datetime.now().isoformat(),
                 "step_type": "reasoning",
-                "agent_reasoning": result.model_dump(),
+                "agent_reasoning": summary,
             }
         )
 
@@ -145,11 +143,11 @@ class BaseAgent(AgentRegistryMixin):
         """Prepare available tools for current agent state and progress."""
         raise NotImplementedError("_prepare_tools must be implemented by subclass")
 
-    async def _reasoning_phase(self) -> ReasoningTool:
+    async def _reasoning_phase(self) -> BaseReasoningTool:
         """Call LLM to decide next action based on current context."""
         raise NotImplementedError("_reasoning_phase must be implemented by subclass")
 
-    async def _select_action_phase(self, reasoning: ReasoningTool) -> BaseTool:
+    async def _select_action_phase(self, reasoning: BaseReasoningTool) -> BaseTool:
         """Select most suitable tool for the action decided in reasoning phase.
 
         Returns the tool suitable for the action.
@@ -163,9 +161,10 @@ class BaseAgent(AgentRegistryMixin):
         """
         raise NotImplementedError("_action_phase must be implemented by subclass")
 
-    async def execute(
-        self,
-    ):
+    def is_interrupting_tool(self, tool: BaseTool) -> bool:
+        return isinstance(tool, self.interrupting_tool_types)
+
+    async def execute(self):
         self.logger.info(f"🚀 Starting for task: '{self.task}'")
         self.conversation.extend(
             [
@@ -176,7 +175,7 @@ class BaseAgent(AgentRegistryMixin):
             ]
         )
         try:
-            while self._context.state not in AgentStatesEnum.FINISH_STATES.value:
+            while self._context.state not in AgentStatesEnum.FINISH_STATES:
                 self._context.iteration += 1
                 self.logger.info(f"Step {self._context.iteration} started")
 
@@ -185,8 +184,8 @@ class BaseAgent(AgentRegistryMixin):
                 action_tool = await self._select_action_phase(reasoning)
                 await self._action_phase(action_tool)
 
-                if isinstance(action_tool, ClarificationTool):
-                    self.logger.info("\n⏸️  Research paused - please answer questions")
+                if self.is_interrupting_tool(action_tool):
+                    self.logger.info("\n⏸️  Research paused - awaiting external input")
                     self._context.state = AgentStatesEnum.WAITING_FOR_CLARIFICATION
                     self.streaming_generator.finish()
                     self._context.clarification_received.clear()

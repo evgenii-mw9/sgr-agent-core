@@ -5,13 +5,8 @@ from openai.types.chat import ChatCompletionFunctionToolParam
 
 from sgr_deep_research.core.agent_definition import ExecutionConfig, LLMConfig, PromptsConfig
 from sgr_deep_research.core.base_agent import BaseAgent
-from sgr_deep_research.core.tools import (
-    BaseTool,
-    ClarificationTool,
-    CreateReportTool,
-    FinalAnswerTool,
-    WebSearchTool,
-)
+from sgr_deep_research.core.policies import ToolSelectionPolicy
+from sgr_deep_research.core.tools import BaseTool
 
 
 class ToolCallingAgent(BaseAgent):
@@ -28,6 +23,7 @@ class ToolCallingAgent(BaseAgent):
         prompts_config: PromptsConfig,
         execution_config: ExecutionConfig,
         toolkit: list[Type[BaseTool]] | None = None,
+        tool_selection_policy: ToolSelectionPolicy | None = None,
     ):
         super().__init__(
             task=task,
@@ -36,26 +32,13 @@ class ToolCallingAgent(BaseAgent):
             prompts_config=prompts_config,
             execution_config=execution_config,
             toolkit=toolkit,
+            tool_selection_policy=tool_selection_policy,
         )
-        self.max_searches = execution_config.max_searches
         self.tool_choice: Literal["required"] = "required"
 
     async def _prepare_tools(self) -> list[ChatCompletionFunctionToolParam]:
         """Prepare tool classes with current context limits."""
-        tools = set(self.toolkit)
-        if self._context.iteration >= self.max_iterations:
-            tools = {
-                CreateReportTool,
-                FinalAnswerTool,
-            }
-        if self._context.clarifications_used >= self.max_clarifications:
-            tools -= {
-                ClarificationTool,
-            }
-        if self._context.searches_used >= self.max_searches:
-            tools -= {
-                WebSearchTool,
-            }
+        tools = set(self.tool_selection_policy.tools_for_action(self))
         return [pydantic_function_tool(tool, name=tool.tool_name, description="") for tool in tools]
 
     async def _reasoning_phase(self) -> None:

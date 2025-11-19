@@ -3,7 +3,7 @@ import logging
 from tavily import AsyncTavilyClient
 
 from sgr_deep_research.core.agent_config import GlobalConfig
-from sgr_deep_research.core.models import SourceData
+from sgr_deep_research.research.models import SourceData
 
 logger = logging.getLogger(__name__)
 
